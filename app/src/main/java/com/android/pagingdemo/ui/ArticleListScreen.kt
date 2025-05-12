@@ -12,14 +12,10 @@ import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.android.pagingdemo.data.Article
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
 @Composable
 fun ArticleListScreen(viewModel: ArticleViewModel) {
     val articles = viewModel.items.collectAsLazyPagingItems()
-    val isRefreshing = articles.loadState.refresh is LoadState.Loading
-    val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
 
     Scaffold(
         topBar = {
@@ -29,56 +25,53 @@ fun ArticleListScreen(viewModel: ArticleViewModel) {
             )
         }
     ) { innerPadding ->
-        SwipeRefresh(
-            state = swipeRefreshState,
-            onRefresh = { articles.refresh() },
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(innerPadding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                itemsIndexed(articles.itemSnapshotList.items) { _, article ->
-                    if (article != null) {
-                        ArticleItem(article)
-                        Divider()
+            itemsIndexed(articles.itemSnapshotList.items) { _, article ->
+                if (article != null) {
+                    ArticleItem(article)
+                    Divider()
+                }
+            }
+
+            // Loading at the bottom
+            if (articles.loadState.append is LoadState.Loading) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
                     }
                 }
+            }
 
-                if (articles.loadState.append is LoadState.Loading) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
-                    }
+            // Append error at the bottom
+            if (articles.loadState.append is LoadState.Error) {
+                val error = (articles.loadState.append as LoadState.Error).error
+                item {
+                    RetrySection(
+                        message = "Error loading more: ${error.localizedMessage ?: "Unknown"}",
+                        onRetry = { articles.retry() }
+                    )
                 }
+            }
 
-                if (articles.loadState.append is LoadState.Error) {
-                    val error = (articles.loadState.append as LoadState.Error).error
-                    item {
-                        RetrySection(
-                            message = "Error loading more: ${error.localizedMessage ?: "Unknown"}",
-                            onRetry = { articles.retry() }
-                        )
-                    }
-                }
-
-                if (articles.loadState.refresh is LoadState.Error) {
-                    val error = (articles.loadState.refresh as LoadState.Error).error
-                    item {
-                        RetrySection(
-                            message = "Initial load error: ${error.localizedMessage ?: "Unknown"}",
-                            onRetry = { articles.retry() }
-                        )
-                    }
+            // Initial load error
+            if (articles.loadState.refresh is LoadState.Error) {
+                val error = (articles.loadState.refresh as LoadState.Error).error
+                item {
+                    RetrySection(
+                        message = "Initial load error: ${error.localizedMessage ?: "Unknown"}",
+                        onRetry = { articles.retry() }
+                    )
                 }
             }
         }
